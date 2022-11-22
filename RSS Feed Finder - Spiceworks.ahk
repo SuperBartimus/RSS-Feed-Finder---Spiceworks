@@ -2,7 +2,7 @@
 -------------------------------------------------------
 OrigName: FeedFinder-Spiceworks.ahk
 Created: 2022-Nov-18 09:51:37
-First Created \\PF0Y7SQH by user Bart.Strauss
+First Created  on \\PF0Y7SQH by user Bart.Strauss
 -------------------------------------------------------
 */
 
@@ -14,9 +14,8 @@ InitializeScript: ; #Region Initialize Script
 SetBatchLines, -1 ; maximum speed of executing lines in the script
 SendMode Input ; used to set up buffering of Keystrokes and mouse click.  Performace improvement over 'SendMode Event'
 SetWorkingDir %A_ScriptDir%
-; #EndRegion
-
-main:
+; #EndRegion Initialize Script
+;~ -----
 /*
 Based off of articles:
 https://community.spiceworks.com/blog/77-how-do-you-use-the-community-rss-feeds
@@ -53,7 +52,7 @@ HTMLTop =
 Number Of Feeds=
 </div><hr>
 	<table><tr>
-<th>#</th><th> Title</th><th>Feed ID</th><th>Description</th>
+<th>#</th><th> Title</th><th># of Articles</th><th>Feed ID</th><th>Description</th>
 </tr>
 
 	)
@@ -85,6 +84,7 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 		title :=
 		description :=
 		img :=
+		NumOfArticles := 0
 		id := (StrSplit(ThisBase,"/"))[5] . " #" . A_Index
 
 		TotalProg++
@@ -107,6 +107,13 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 
 
 			}
+
+			Loop, Parse, Feed,`n,`r
+			{
+				If (InStr(A_LoopField,"<item")) ; in place to go thru only the top of the downloaded page and stop after it gets to the first article.  Less processing time and doesn't muddle up process results below.
+					NumOfArticles++
+			}
+
 		}
 		else
 			continue
@@ -116,7 +123,7 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 			cnt++
 			HTMRow =
 			(
-				<tr><td style="text-align:right;">%cnt%</td><td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td><td style="text-align:right;">%id%</td><td>%description%</td></tr>
+				<tr><td style="text-align:right;">%cnt%</td><td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td><td style="text-align:right;">%NumOfArticles%</td><td style="text-align:right;">%id%</td><td>%description%</td></tr>
 				)
 			fileappend,%HTMRow%`n,%A_ScriptName%.htm
 			IniWrite, `t%cnt%,%A_ScriptName%.htm,Statistics,Number Of Feeds ; Writing to top of the HTML
