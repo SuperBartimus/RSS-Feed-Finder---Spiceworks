@@ -1,0 +1,4 @@
+# RSS-Feed-Finder---Spiceworks
+This was a script to find many of Spiceworks.com RSS feeds.  
+
+So, I'm pretty big in to having a list of RSS feeds that I scroll through.  I just like being able have all my news sources in to one locations and just get in, get thru, get done with it.  On the lines of quick and dirty, I thought, hmm... could I easily incorporate Spiceworks into my other news.  So I went off on a hunt for Spiceworks RSS Feeds.  But low and be hold, there's no documentation or anything else that easily lists what feeds there are and how to get them.  I searched the forums a bit and found some old posts about the topic, but nothing was very current nor were there any listings.  I did learn some things though and decided, "you know what... I bet I can find a good portion of them"With that said, I went don't the coding rabbit hole and slapped together ( a little messily ) a 'scanning tool'
