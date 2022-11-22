@@ -9,6 +9,7 @@ So, I'm pretty big in to having a list of RSS feeds that I scroll through.  I j
 
 ##### HOW TO USE:
 This is an AUTOHOTKEY script.  Just save it to device and execute it like any other scipt.
+No inputs are required. It will export a basic HTML document that you can find the URLS.
 
 ##### NOTES:
 The script is a bit slow.  No parallel process here.  I was looking for something relatively quickly (*even though I did put some foo-foo into it*) put together and didn't want to take time managing CPU and RAM utilization.  Also, it wasn't like this was a time-sensitive project either.  Took only a few minutes to whip up the code.  A few more to make it pretty and some bug squishing.  I know it's not well commented, but it was for me and probably only a one time use.  Just thought maybe others would like to have it too.
