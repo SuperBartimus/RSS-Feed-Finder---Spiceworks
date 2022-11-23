@@ -23,19 +23,19 @@ https://community.spiceworks.com/blog/77-how-do-you-use-the-community-rss-feeds
 FeedBase = ; URL to append followed by maximum iterations of it.
 (
 https://community.spiceworks.com/feed/blog/,100
-https://community.spiceworks.com/feed/forum/,7000
+https://community.spiceworks.com/feed/forum/,10000
 	)
 
 FileDelete,%A_ScriptName%.htm
 cnt:=0
 RemoveRefresh =
-
+RefreshTag = <meta id="refresh" http-equiv="refresh" content="5" />
 HTMLTop =
 (
 	<html>
 	<head>
  <!-- Next line to help show progress.  May want to remove/comment out when done building. -->
-	<meta id="refresh" http-equiv="refresh" content="5" />
+	%RefreshTag%
 	</head>
 	<style>
 		html {	font-family: 'Trebuchet MS', 'Lucida Sans', Arial, sans-serif;background:silver;	}
@@ -47,6 +47,8 @@ HTMLTop =
 		.count {	font-size: large; 	}
 		.pubDate {	font-family:Consolas, Courier, monospace; text-align:right;	}
 		.HaveRSS {	background:darkgrey; color:white;	}
+		.NoArticles {	background:yellow; color:darkgrey;	}
+		.LastPubAge {	Text-Align:right;	}
 	</style>
 	<body>
 	<div class="Count">
@@ -54,7 +56,7 @@ HTMLTop =
 Number Of Feeds=
 </div><hr>
 	<table><tr>
-<th>#</th><th> Title</th><th># of Articles</th><th>Most Recent Post</th><th>Feed ID</th><th>Description</th>
+<th>#</th><th> Title</th><th># of Articles</th><th>Most Recent Post</th><th>Days Old</th><th>Feed ID</th><th>Description</th>
 </tr>
 
 	)
@@ -77,6 +79,7 @@ Gui, add, Text, w%FeedProgW% vCountTXT y+5, Feeds Found: 0
 Gui,Show
 ; #EndRegion Build GUI for progress
 
+CSV =
 TotalProg := 0
 Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 {
@@ -137,13 +140,56 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 				}
 			}
 
+			RawLastPubDate := ParseRCF822Date(LastPub, 1)
+			LastPubAge := a_Now
+			EnvSub, LastPubAge, RawLastPubDate, Days
+
+			AgeOpacity := LastPubAge-30
+			If (AgeOpacity < 0)
+				AgeOpacity := 0
+			If (AgeOpacity > 255)
+				AgeOpacity := 255
+
+			AgeColor = 255,0,0
+			if (LastPubAge < 61)
+			{
+				AgeOpacity  := 128
+				AgeColor = 255,255,0
+			}
+			if (LastPubAge < 30)
+				AgeColor = 128,255,0
+			if (LastPubAge < 8)
+				AgeColor = 0,255,0
+
+			if (NumOfArticles = 0)
+			{
+				AgeOpacity := 0
+				AgeColor = 0,0,0
+			}
+
+
+			FormatTime, LastPub, %RawLastPubDate%, yyyy-MM-dd HH:mm:ss
+			CSV = %CSV%"%Title%",%LastPub%,%LastPubAge%,%NumOfArticles%,"%value%","%Description%"`n
 
 			cnt++
 			HTMRow =
 				(
-				<tr><td style="text-align:right;">%cnt%</td><td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td><td style="text-align:right;">%NumOfArticles%</td><td class="pubDate">%LastPub%</td><td style="text-align:right;">%id%</td><td>%description%</td></tr>
+				<tr><td style="text-align:right;">%cnt%</td>
+					<td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td>
+					<td style="text-align:right;">%NumOfArticles%</td>
+					<td class="pubDate">%LastPub%</td>
+					<td class="LastPubAge" style="background: rgba(%AgeColor%,%AgeOpacity%);">%LastPubAge%</td>
+					<td style="text-align:right;">%id%</td>
+					<td>%description%</td>
+				</tr>
 				)
 
+			if (NumOfArticles = 0 )
+			{
+				InHTMRow = <tr><td style="text-align:right;">
+				NoArticles = <tr Class="NoArticles"><td style="text-align:right;">
+				HTMRow := StrReplace(HTMRow, InHTMRow,NoArticles)
+			}
 			; #Region This section is specific to my personal RSS aggregator.
 			IniRead, myRSSFeeds, RSS Ticker_ (%A_Computername% %A_UserName%).ini, Sources
 			if (InStr(myRSSFeeds,value))
@@ -153,12 +199,13 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 				HTMRow := StrReplace(HTMRow, InHTMRow,HaveRSS)
 			}
 			; #ENDRegion This section is specific to my personal RSS aggregator.
+
 			fileappend,%HTMRow%`n,%A_ScriptName%.htm
 			IniWrite, `t%cnt%,%A_ScriptName%.htm,Statistics,Number Of Feeds ; Writing to top of the HTML
 			GuiControl,,CountTXT, %TotalProg% of %FeedProgMax% URLs scanned.`t`tFeeds Found: %cnt%
 		}
 	}
-	HTMRow =`n	<tr><td colspan="6" height="5px" style="background:orange;"></td></tr>`n
+	HTMRow =`n	<tr><td colspan="7" height="5px" style="background:orange;"></td></tr>`n
 	fileappend,%HTMRow%`n,%A_ScriptName%.htm
 
 }
@@ -171,6 +218,16 @@ HTMLbottom =
 	)
 
 FileAppend,%HTMLbottom%,%A_ScriptName%.htm
+FileRead,ALLHTM,%A_ScriptName%.htm
+ALLHTM := StrReplace(ALLHTM, RefreshTag)
+FileAppend %ALLHTM%, %A_ScriptName%.tmp
+FileMove %A_ScriptName%.tmp, %A_ScriptName%.htm, 1
+Sort CSV
+Sort CSV, U
+FileDelete, %A_ScriptName%.csv
+CSV = "RSS Title","Last Article Pub'd","Days Old","# of Articles","URL of RSS","Description"`n%CSV%
+FileAppend, %CSV%,%A_ScriptName%.csv
+IniWrite, `t%cnt%  (final result),%A_ScriptName%.htm,Statistics,Number Of Feeds ; Writing to top of the HTML
 MsgBox, end
 
 ExitApp
@@ -184,4 +241,54 @@ UrlDownloadToVar(URL) {
 	WebRequest.Open("GET", URL)
 	WebRequest.Send()
 	Return WebRequest.ResponseText
+}
+
+
+ParseRCF822Date(datetime, UTC=0, centurythreshold=2010){
+	;Returns YYYYMMDDHH24MISS from a RFC822 or RSS PubDate date-time.
+	static Needle:="i)([a-z]{3}),{0,1} (\d{1,2}) ([a-z]{3}) (\d{2,4}) (\d{1,2}):(\d{2}):{0,1}(\d{0,2}) ?([a-z0-9+-]{0,5})"
+		, months:="Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+	FormatFloat:=A_FormatFloat, c:=0
+	If !RegExMatch(datetime,needle,dt)
+		Return False
+	If (dt7="")
+		dt7=0
+	If (dt8="")
+		dt8=z
+
+	If (UTC){
+		If RegExMatch(dt8,"^(\+|-)(\d{2})(\d{2})$",dtc)
+			c:=dtc2*60+dtc3*(dtc1="+" ? 1 : -1)
+		Else If RegExMatch(dt8,"i)^([a-z]{2,3})$")
+			; c:= (-4*!!RegExMatch(dt8,"i)EDT")-5*!!RegExMatch(dt8,"i)EST|CDT")-6*!!RegExMatch(dt8,"i)CST|MDT")-7*!!RegExMatch(dt8,"i)MST|PDT")-8*!!RegExMatch(dt8,"i)PST"))*60
+		c:= (-4*!!RegExMatch(dt8,"i)EDT")-4*!!RegExMatch(dt8,"i)EST|CDT")-5*!!RegExMatch(dt8,"i)CST|MDT")-6*!!RegExMatch(dt8,"i)MST|PDT")-7*!!RegExMatch(dt8,"i)PST"))*60 ; Adjusted because it seemed ahead by an hour.
+		Else If RegExMatch(dt8,"i)^([a-z]{1})$")
+			c:=(InStr("MLKIHGFEDCBAZNOPQRSTUVWXY",dt8)-13)*60
+	}
+
+	SetFormat,Float,04.0
+	YYYY:= (dt4<100 ? dt4<Mod(centurythreshold,100) ? dt4+(centurythreshold//100)*100-100 : dt4+(centurythreshold//100)*100 : dt4)+0.0
+	SetFormat,Float,02.0
+	MM:=(InStr(months, dt3)//4)+1.0
+	DD:=dt2+0.0
+	HH24:=dt5+0.0
+	If (HH24>A_Hour)
+	{
+		difference:=a_now,difference+=-a_nowUTC
+		difference:=difference/10000
+		HH24:=Format("{:02}", HH24+difference)
+	}
+	MI:=dt6+0.0
+	SS:=dt7+0.0
+
+	SetFormat,Float,% FormatFloat
+
+	Result:=YYYY . MM . DD . HH24 . MI . SS
+	; TickerItemDateTime:=YYYY . "-" . MM . "-" . DD . " " . HH24 . ":" . MI . ":" . SS
+	TickerItemDateTime:=YYYY . MM . DD . HH24 . MI . SS
+	If (TickerItemDateTime > A_Now)
+		TickerItemDateTime += -1, hours
+	FormatTime, TickerItemDateTime, %TickerItemDateTime%, yyyy-MM-dd HH:mm:ss
+	Result+=-c,Minutes
+	Return Result
 }
