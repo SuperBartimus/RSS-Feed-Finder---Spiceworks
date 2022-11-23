@@ -20,10 +20,10 @@ SetWorkingDir %A_ScriptDir%
 Based off of articles:
 https://community.spiceworks.com/blog/77-how-do-you-use-the-community-rss-feeds
 */
-FeedBase =
+FeedBase = ; URL to append followed by maximum iterations of it.
 (
-https://community.spiceworks.com/feed/blog/
-https://community.spiceworks.com/feed/forum/
+https://community.spiceworks.com/feed/blog/,100
+https://community.spiceworks.com/feed/forum/,7000
 	)
 
 FileDelete,%A_ScriptName%.htm
@@ -44,7 +44,9 @@ HTMLTop =
 		td a:hover {	background: white;	}
 		th {	background:black;color:orange;	}
 		img {	float:left; heigh:14px; width:14px;	}
-		.count {	font-size: large;	}
+		.count {	font-size: large; 	}
+		.pubDate {	font-family:Consolas, Courier, monospace; text-align:right;	}
+		.HaveRSS {	background:darkgrey; color:white;	}
 	</style>
 	<body>
 	<div class="Count">
@@ -52,18 +54,22 @@ HTMLTop =
 Number Of Feeds=
 </div><hr>
 	<table><tr>
-<th>#</th><th> Title</th><th># of Articles</th><th>Feed ID</th><th>Description</th>
+<th>#</th><th> Title</th><th># of Articles</th><th>Most Recent Post</th><th>Feed ID</th><th>Description</th>
 </tr>
 
 	)
 FileAppend,%HTMLtop%,%A_ScriptName%.htm
 
+FeedIDs := 0 ; number of feeds to try.  URI will be like /feed/forum/[NUMBER].rss.  Feeds have been found where 'ID' has been 4 digits.F12
 Loop,parse,feedbase,`n,`r
+{
+	ThisBase := (StrSplit(A_LoopField,"`,"))[1]
 	feedcnt := A_Index
-FeedIDs := 10000 ; number of feeds to try.  URI will be like /feed/forum/[NUMBER].rss.  Feeds have been found where 'ID' has been 4 digits.F12
+	FeedIDs += ThisBase := (StrSplit(A_LoopField,"`,"))[2]
+}
 
 ; #Region Build GUI for progress
-FeedProgMax := FeedCnt * FeedIDs
+FeedProgMax := FeedIDs
 FeedProgW := A_ScreenWidth *.75
 Gui, add, Text,w%FeedProgW% vScanTXT, Scanning for feed
 Gui, add, Progress, vFeedProg w%FeedProgW% Range0-%FeedProgMax% border y+5
@@ -74,8 +80,9 @@ Gui,Show
 TotalProg := 0
 Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 {
-	ThisBase := A_LoopField
-	Loop,%FeedIDs% ; Loop thru count of IDs to look for
+	ThisBase := (StrSplit(A_LoopField,"`,"))[1]
+	ThisBasesIDs:= (StrSplit(A_LoopField,"`,"))[2]
+	Loop,%ThisBasesIDs% ; Loop thru count of IDs to look for
 	{
 		value := ThisBase . A_Index . ".rss"
 		GuiControl,,ScanTXT, Scanning for Feed at: %value%
@@ -84,6 +91,7 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 		title :=
 		description :=
 		img :=
+		LastPub :=
 		NumOfArticles := 0
 		id := (StrSplit(ThisBase,"/"))[5] . " #" . A_Index
 
@@ -120,19 +128,40 @@ Loop,parse,feedbase,`n,`r ; Loop thru site URLs
 
 		if (title != "" AND title !="Page Not Found") ; error catching for page IDs that don't return anything or return a 404 page.  Usually matches to HTML HEAD <TITlE> tag as opposed to RSS XML <title> field.
 		{
+			Loop, Parse, Feed,`n,`r
+			{
+				If (InStr(A_LoopField,"<pubDate")) ; Looks to see when the last article was published.  Maybe to see if forum is dead.
+				{
+					LastPub := StrReplace(StrReplace(trim(strreplace(strreplace(A_LoopField,"`n"),"`r")),"<pubDate>"),"</pubDate>")
+					Break
+				}
+			}
+
+
 			cnt++
 			HTMRow =
-			(
-				<tr><td style="text-align:right;">%cnt%</td><td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td><td style="text-align:right;">%NumOfArticles%</td><td style="text-align:right;">%id%</td><td>%description%</td></tr>
+				(
+				<tr><td style="text-align:right;">%cnt%</td><td><a href="%value%" target="_blank"><img src="%img%"/>%title%</a></td><td style="text-align:right;">%NumOfArticles%</td><td class="pubDate">%LastPub%</td><td style="text-align:right;">%id%</td><td>%description%</td></tr>
 				)
+
+			; #Region This section is specific to my personal RSS aggregator.
+			IniRead, myRSSFeeds, RSS Ticker_ (%A_Computername% %A_UserName%).ini, Sources
+			if (InStr(myRSSFeeds,value))
+			{
+				InHTMRow = <tr><td style="text-align:right;">
+				HaveRSS = <tr Class="HaveRSS"><td style="text-align:right;">
+				HTMRow := StrReplace(HTMRow, InHTMRow,HaveRSS)
+			}
+			; #ENDRegion This section is specific to my personal RSS aggregator.
 			fileappend,%HTMRow%`n,%A_ScriptName%.htm
 			IniWrite, `t%cnt%,%A_ScriptName%.htm,Statistics,Number Of Feeds ; Writing to top of the HTML
 			GuiControl,,CountTXT, %TotalProg% of %FeedProgMax% URLs scanned.`t`tFeeds Found: %cnt%
 		}
 	}
-	HTMRow =`n	<tr><td colspan="4" style="background:orange;"></td></tr>`n
+	HTMRow =`n	<tr><td colspan="6" height="5px" style="background:orange;"></td></tr>`n
 	fileappend,%HTMRow%`n,%A_ScriptName%.htm
-} 
+
+}
 
 HTMLbottom =
 (
